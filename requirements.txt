@@ -10,3 +10,4 @@ opencv-python
 python-multipart
 mysql-connector-python
 ollama
+numpy
