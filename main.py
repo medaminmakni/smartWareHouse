@@ -254,16 +254,27 @@ async def chatbot_order(data: dict):
         # ====================================================================
         # RAG: Retrieve relevant rules from knowledge base
         # ====================================================================
-        from src.rag_engine import WarehouseRAGEngine
+        from src.rag_engine import get_engine
         from src.database import (
             get_pending_orders_today, get_sales_report_today, get_clients_visited_today
         )
-        rag_engine = WarehouseRAGEngine()
-        
-        # Query for chatbot rules and relevant policies
-        rag_query = f"règles chatbot commande client {user_message}"
-        rag_rules = rag_engine.query(rag_query, n_results=5)
-        rag_context = "\n".join(rag_rules) if rag_rules else ""
+        # get_engine() returns a module-level singleton. Constructing
+        # WarehouseRAGEngine() here reloaded the sentence-transformer model on
+        # every chat message.
+        rag_engine = get_engine()
+
+        # Two queries rather than one: the user's message retrieves topical
+        # content, while a fixed query keeps the chatbot's own conduct rules in
+        # context even when the message does not resemble them lexically.
+        rag_hits = rag_engine.query_multi(
+            [
+                f"{user_message}",
+                "règles du chatbot ton langue gestion des commandes "
+                "identification du client comportement général",
+            ],
+            n_results=4,
+        )
+        rag_context = "\n---\n".join(doc for doc, _, _ in rag_hits[:6])
         
         # ====================================================================
         # ADMIN QUERIES: Build context for admin business flows
@@ -319,9 +330,9 @@ PRODUITS DISPONIBLES:
 {chr(10).join([f'{p["name"]} (Stock: {p.get("stock", "N/A")}, Prix: {p.get("price", "N/A")} TND)' for p in available_products]) if available_products else 'Aucun produit'}
 
 CONTEXTE ADMIN (REQUÊTES MÉTIER):
-{pending_orders_context if pending_orders_context else 'Pas de commandes en attente aujourd\'hui'}
-{sales_report_context if sales_report_context else 'Pas de ventes aujourd\'hui'}
-{clients_visited_context if clients_visited_context else 'Pas de clients visiteurs aujourd\'hui'}
+{pending_orders_context if pending_orders_context else "Pas de commandes en attente aujourd'hui"}
+{sales_report_context if sales_report_context else "Pas de ventes aujourd'hui"}
+{clients_visited_context if clients_visited_context else "Pas de clients visiteurs aujourd'hui"}
 
 HISTORIQUE DE CONVERSATION:
 {history_text if history_text else 'Nouvelle conversation'}
