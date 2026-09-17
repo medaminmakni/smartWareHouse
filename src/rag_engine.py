@@ -3,8 +3,10 @@ import re
 import glob
 from typing import List, Dict, Optional, Tuple
 
-import chromadb
-from chromadb.utils import embedding_functions
+# chromadb is imported lazily inside WarehouseRAGEngine.__init__ so that the
+# pure-python helpers in this module (notably _chunk_markdown) can be imported
+# without pulling in the vector store — eval_retrieval.py needs the chunker,
+# not the database.
 
 # ---------------------------------------------------------------------------
 # Embedding model
@@ -116,6 +118,9 @@ def _chunk_markdown(content: str, target: int = TARGET_CHUNK,
 
 class WarehouseRAGEngine:
     def __init__(self, db_path: str = "./warehouse_db", embed_model: Optional[str] = None):
+        import chromadb
+        from chromadb.utils import embedding_functions
+
         self.embed_model_name = embed_model or os.getenv("RAG_EMBED_MODEL", DEFAULT_EMBED_MODEL)
 
         self.client = chromadb.PersistentClient(path=db_path)
